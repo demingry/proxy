@@ -1,0 +1,5 @@
+[default]
+apikey = 
+max_threads = 4
+request_number = 20
+result_file = newfiletext

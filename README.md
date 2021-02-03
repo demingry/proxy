@@ -37,7 +37,7 @@
 ## issue
 * post your issue here, or georgedeming@outlook.com
 
-##about
+## about
 
 * runoob here....... demingry@hzuna
 * our home -> [hzuna](https://github.com/hzuna)

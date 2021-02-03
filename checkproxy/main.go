@@ -14,19 +14,27 @@ import (
 import "checkproxy/chkpro"
 
 
+/*
+ target to scan struct
+*/
 type target struct{
 	proxyIP string
 	portslice []int
-	wg *sync.WaitGroup
 	issocks bool
 }
 
-
+/*
+ target init
+*/
 func Newtarget(proxyIP string,is_socks bool)*target{
-	return &target{proxyIP,[]int{},&sync.WaitGroup{},is_socks}
+	return &target{proxyIP,[]int{},is_socks}
 }
 
+/*
+ convert param port_range to real port
+*/
 func (t *target)Port_handle(port_range string){
+	//port range
 	if strings.Contains(port_range,"-"){
 		stringsplit := strings.Split(port_range,"-")
 		start_temp,err1 := strconv.Atoi(stringsplit[0])
@@ -41,9 +49,8 @@ func (t *target)Port_handle(port_range string){
 				for port:=start_temp;port<=end_temp;port++ {
 					t.portslice = append(t.portslice,port)
 				}
-				t.wg.Add(end_temp-start_temp+1)
 			}
-		}
+		}//multi ports
 	}else if strings.Contains(port_range,","){
 		stringsplit := strings.Split(port_range,",")
 		for _,i:= range stringsplit{
@@ -52,35 +59,38 @@ func (t *target)Port_handle(port_range string){
 				t.portslice = append(t.portslice,port)
 			}
 		}
-		t.wg.Add(len(t.portslice))
-	}else {
+	}else { //single port
 		startend,_:=strconv.Atoi(port_range)
 		if startend<0 || startend>65535 {
 			panic("[!]please check port range.\n")
 		}
-		t.portslice = append(t.portslice,startend)
-		t.wg.Add(1)
+		t.portslice = append(t.portslice,starten)
 	}
 }
 
+
+/*
+ global var
+*/
 var (
-	wg = sync.WaitGroup{}
 	f func(proxyIP string,proxyPort int,timeout int)(isProxy bool, err error)
 	issocks bool
 	timeout int
-	threads int
-	proxyIP string
 	targets []*target
 )
 
-
+/*
+ print usage
+*/
 func PrintUsage() {
 	fmt.Println("[!]usage:")
 	fmt.Println("\tgo run main.go -h `proxyIP` -p `sigle port or port range or multi ports` -t `timeout` -s `socks else http` -f `file path`\n")
 }
 
 
-
+/*
+ parse params and check
+*/
 func Param_parse() {
 	host := flag.String("h","null","proxyIP")
 	port_range := flag.String("p","null","port range")
@@ -125,6 +135,9 @@ func Param_parse() {
 }
 
 
+/*
+ type http or socks
+*/
 func Istype(issocks bool) {
 	if issocks {
 		f = chkpro.SocksProxy{}.IsProxy
@@ -139,29 +152,29 @@ func Istype(issocks bool) {
 
 func main(){
 
-	//synchan := make(chan int, 30)
+
+	var current = sync.WaitGroup{}
 	Param_parse()
 	var now = time.Now().Unix()
-	var Map = make(map[int]bool)
+	var Map = make(map[string]int)
 	for _,host := range targets{
 		Istype(host.issocks)
 		for _,port:= range host.portslice{
-			go func(port int){
-				isProxy,err := f(host.proxyIP,port,timeout)
-				//isProxy,err:=chkpro.SocksProxy{}.IsProxy(proxyIP,port,timeout)
+			current.Add(1)
+			go func(ip string, port int){
+				isProxy,err := f(ip,port,timeout)
 				if isProxy {
-					fmt.Printf("%s:%d\n",proxyIP,port)
-					Map[port] = true
+					Map[ip] = port
 				}
 				if err!=nil{
 					fmt.Println(err)
 				}
-				host.wg.Done()
-			}(port)
+				current.Done()
+			}(host.proxyIP,port)
 		}
-		host.wg.Wait()
-		fmt.Printf("finished scanned %d port(s).\n",len(host.portslice))
-		fmt.Printf("Time els: %d.\n",time.Now().Unix()-now)
-		fmt.Println(Map)
 	}
+	current.Wait()
+	fmt.Printf("Totally %d host(s). Live %d .\n",len(targets),len(Map))
+	fmt.Printf("Time els: %d.\n",time.Now().Unix()-now)
+	fmt.Println(Map)
 }
